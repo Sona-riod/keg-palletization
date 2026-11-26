@@ -1,0 +1,14 @@
+[Unit]
+Description=Keg Palletization: always boot into the kiosk (app) session
+Documentation=file:///home/icam-540/Desktop/video_vision/palletization_final/deploy/DEPLOY.md
+# Must run before GDM reads the auto-login session.
+Before=display-manager.service gdm.service gdm3.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/keg-session-switch kiosk
+TimeoutStartSec=30
+
+[Install]
+WantedBy=graphical.target

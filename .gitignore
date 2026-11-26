@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+logs/
+keg_detection.db
+keg_frames/
+*.engine
+.venv/
+venv/
+.vscode/

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Palletization App
+Comment=Leave the desktop and go back to the palletization app (kiosk)
+Exec=sudo -n /usr/local/sbin/keg-session-switch kiosk --restart
+Icon=/home/icam-540/.local/share/icons/checkology-app-icon.png
+Terminal=false
+Type=Application
+Categories=Utility;

@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Keg Palletization Kiosk
+Comment=Only the palletization app, no desktop (see deploy/DEPLOY.md, Fast kiosk boot)
+Exec=/bin/bash /home/icam-540/Desktop/video_vision/palletization_final/deploy/keg-kiosk-session.sh
+Type=Application
+DesktopNames=KegKiosk

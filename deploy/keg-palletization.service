@@ -1,0 +1,21 @@
+[Unit]
+Description=Keg Palletization HMI (Advantech iCam-540, Position 3 / pallet)
+Documentation=file:///home/icam-540/Desktop/video_vision/palletization_final/deploy/DEPLOY.md
+# Start only once the graphical session is up — the Qt GUI needs a display.
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/icam-540/Desktop/video_vision/palletization_final
+ExecStart=/home/icam-540/Desktop/video_vision/palletization_final/start_prod.sh
+# Restart on ANY exit (crash, segfault, or if the operator somehow closes it).
+Restart=always
+RestartSec=3
+# The app draws to the primary X display of the auto-logged-in session.
+Environment=DISPLAY=:0
+# If your session's auth cookie is not the default, uncomment and set it:
+# Environment=XAUTHORITY=/home/icam-540/.Xauthority
+
+[Install]
+WantedBy=graphical-session.target

@@ -1,0 +1,101 @@
+#!/bin/bash
+# =============================================================================
+#  keg-session-switch  —  choose what GDM auto-logs in to: kiosk or desktop
+# =============================================================================
+# Installed as /usr/local/sbin/keg-session-switch (root-owned) by
+# deploy/install-kiosk-exit-desktop.sh. The kiosk user may run it with
+# "sudo -n" thanks to /etc/sudoers.d/keg-kiosk.
+#
+#   keg-session-switch kiosk              next login = the app only (kiosk)
+#   keg-session-switch desktop            next login = normal Ubuntu desktop
+#   keg-session-switch desktop --restart  ...and restart GDM now, so the
+#                                         switch happens right away
+#   keg-session-switch status             print the current setting
+#
+# keg-kiosk-boot.service runs "keg-session-switch kiosk" at every boot, so a
+# power-on always starts the app, whatever was chosen before.
+set -u
+
+CONF=/etc/default/keg-kiosk
+KIOSK_USER=icam-540
+KIOSK_SESSION=keg-kiosk
+DESKTOP_SESSION_NAME=ubuntu
+# shellcheck disable=SC1090
+[[ -r "$CONF" ]] && . "$CONF"
+
+if [[ $EUID -ne 0 ]]; then
+    echo "keg-session-switch: must run as root (use: sudo -n $0 $*)" >&2
+    exit 1
+fi
+
+MODE="${1:-}"
+RESTART="${2:-}"
+
+case "$MODE" in
+    kiosk)   SESSION="$KIOSK_SESSION" ;;
+    desktop) SESSION="$DESKTOP_SESSION_NAME" ;;
+    status)
+        grep -E '^(X)?Session=' "/var/lib/AccountsService/users/$KIOSK_USER" 2>/dev/null
+        exit 0 ;;
+    *)
+        echo "usage: $0 kiosk|desktop|status [--restart]" >&2
+        exit 2 ;;
+esac
+
+if [[ -n "$RESTART" && "$RESTART" != "--restart" ]]; then
+    echo "usage: $0 kiosk|desktop|status [--restart]" >&2
+    exit 2
+fi
+
+UID_NUM="$(id -u "$KIOSK_USER" 2>/dev/null)" || {
+    echo "keg-session-switch: user '$KIOSK_USER' not found" >&2
+    exit 1
+}
+
+logger -t keg-session-switch "next session for $KIOSK_USER: $SESSION${RESTART:+ (restarting GDM)}"
+
+# Remember (until the next boot: /run is emptied at boot) that the desktop was
+# asked for on purpose. keg-desktop-guard.sh sends a desktop that appears
+# WITHOUT this mark back to the kiosk.
+if [[ "$MODE" == "desktop" ]]; then
+    touch /run/keg-desktop-requested
+else
+    rm -f /run/keg-desktop-requested
+fi
+
+# 1. Preferred: tell AccountsService over D-Bus. It stores the choice in its
+#    file AND updates its in-memory copy, which GDM reads.
+ok=0
+if command -v busctl >/dev/null 2>&1; then
+    OBJ="/org/freedesktop/Accounts/User$UID_NUM"
+    if timeout 10 busctl call org.freedesktop.Accounts "$OBJ" \
+            org.freedesktop.Accounts.User SetXSession s "$SESSION" >/dev/null 2>&1 &&
+       timeout 10 busctl call org.freedesktop.Accounts "$OBJ" \
+            org.freedesktop.Accounts.User SetSession s "$SESSION" >/dev/null 2>&1; then
+        ok=1
+    fi
+fi
+
+# 2. Fallback: edit the AccountsService file directly, then make the daemon
+#    reload it.
+if [[ $ok -eq 0 ]]; then
+    F="/var/lib/AccountsService/users/$KIOSK_USER"
+    mkdir -p "$(dirname "$F")"
+    [[ -f "$F" ]] || printf '[User]\nSystemAccount=false\n' > "$F"
+    for key in XSession Session; do
+        if grep -q "^$key=" "$F"; then
+            sed -i "s/^$key=.*/$key=$SESSION/" "$F"
+        else
+            sed -i "/^\[User\]/a $key=$SESSION" "$F"
+        fi
+    done
+    systemctl try-restart accounts-daemon.service 2>/dev/null || true
+fi
+
+# 3. Optionally restart GDM so the new session starts now. GDM auto-logs in
+#    again after a restart. --no-block: systemd does the restart itself, even
+#    though it ends the session this command was started from.
+if [[ "$RESTART" == "--restart" ]]; then
+    systemctl --no-block restart display-manager.service
+fi
+exit 0

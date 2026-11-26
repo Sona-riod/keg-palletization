@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Keg desktop guard
+Comment=Power-on goes to the palletization app; only Exit App opens the desktop
+Exec=/bin/bash /home/icam-540/Desktop/video_vision/palletization_final/deploy/keg-desktop-guard.sh
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
